@@ -42,6 +42,8 @@
 
 #include "maininterface/windoweffects_module.hpp"
 
+#include "compositor_platform.hpp"
+
 #include <vlc_window.h>
 #include <vlc_modules.h>
 
@@ -57,10 +59,13 @@ struct {
     const char* name;
     Compositor* (*instantiate)(qt_intf_t *p_intf);
 } static compositorList[] = {
-#ifdef _WIN32
-#ifdef HAVE_DCOMP_H
+#if defined(_WIN32) && defined(HAVE_DCOMP_H)
     {"dcomp", &instanciateCompositor<CompositorDirectComposition> },
 #endif
+#if defined(_WIN32) || defined(__APPLE__)
+    {"platform", &instanciateCompositor<CompositorPlatform> },
+#endif
+#if defined(_WIN32)
     {"win7", &instanciateCompositor<CompositorWin7> },
 #endif
 #ifdef QT_HAS_WAYLAND_COMPOSITOR
@@ -336,7 +341,9 @@ bool CompositorVideo::setBlurBehind(QWindow *window, const bool enable)
         m_windowEffectsModule->p_module = module_need(m_windowEffectsModule, "qtwindoweffects", nullptr, false);
         if (!m_windowEffectsModule->p_module)
         {
-            msg_Info(m_intf, "A module providing window effects capability could not be instantiated. Background blur effect will not be available.");
+            msg_Dbg(m_intf, "A module providing window effects capability could not be instantiated. " \
+                            "Native background blur effect will not be available. " \
+                            "The application may compensate this with a simulated effect on certain platform(s).");
             m_failedToLoadWindowEffectsModule = true;
             vlc_object_delete(m_windowEffectsModule);
             m_windowEffectsModule = nullptr;

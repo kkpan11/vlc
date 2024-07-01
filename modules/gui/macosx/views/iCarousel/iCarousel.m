@@ -2271,14 +2271,23 @@ NSComparisonResult compareViewDepth(UIView *view1, UIView *view2, iCarousel *sel
     if (!_didDrag)
     {
         //convert position to view
-        CGPoint position = [theEvent locationInWindow];
-        position = [self convertPoint:position fromView:self.window.contentView];
+        const CGPoint position = [self convertPoint:theEvent.locationInWindow
+                                           fromView:self.window.contentView];
 
         //check for tapped view
-        UIView *itemView = [self itemViewAtPoint:position];
-        NSInteger index = itemView? [self indexOfItemView: itemView]: NSNotFound;
-        if (index != NSNotFound)
-        {
+        UIView * const itemView = [self itemViewAtPoint:position];
+
+        if (theEvent.modifierFlags & NSEventModifierFlagControl) {
+            UIView<iCarouselItemView> * const carouselItemView =
+                (UIView<iCarouselItemView> *)itemView;
+            if ([carouselItemView respondsToSelector:@selector(openContextMenu:)]) {
+                [carouselItemView openContextMenu:theEvent];
+            }
+            return;
+        }
+
+        const NSInteger index = itemView ? [self indexOfItemView: itemView] : NSNotFound;
+        if (index != NSNotFound) {
             if (_centerItemWhenSelected && index != self.currentItemIndex)
             {
                 [self scrollToItemAtIndex:index animated:YES];
@@ -2325,6 +2334,19 @@ NSComparisonResult compareViewDepth(UIView *view1, UIView *view2, iCarousel *sel
     }
 }
 
+- (void)rightMouseDown:(NSEvent *)event
+{
+    //convert position to view
+    const CGPoint position = [self convertPoint:event.locationInWindow
+                                       fromView:self.window.contentView];
+
+    //check for tapped view
+    UIView<iCarouselItemView> * const itemView =
+        (UIView<iCarouselItemView> *)[self itemViewAtPoint:position];
+    if ([itemView respondsToSelector:@selector(openContextMenu:)]) {
+        [itemView openContextMenu:event];
+    }
+}
 
 #pragma mark -
 #pragma mark Keyboard control

@@ -24,9 +24,11 @@
 
 #import "library/VLCLibraryCollectionViewDataSource.h"
 #import "library/VLCLibraryCollectionViewMediaItemSupplementaryDetailView.h"
+#import "library/VLCLibraryCollectionViewMediaItemListSupplementaryDetailView.h"
 #import "library/VLCLibraryUIUnits.h"
 
-#import "library/audio-library/VLCLibraryCollectionViewAlbumSupplementaryDetailView.h"
+#import "library/audio-library/VLCLibraryAudioDataSource.h"
+#import "library/audio-library/VLCLibraryAudioGroupDataSource.h"
 
 #pragma mark - Private data
 static const NSUInteger kAnimationSteps = 32;
@@ -78,6 +80,19 @@ static CVReturn detailViewAnimationCallback(CVDisplayLinkRef displayLink,
 @end
 
 @implementation VLCLibraryCollectionViewFlowLayout
+
++ (instancetype)standardLayout
+{
+    const CGFloat collectionItemSpacing = VLCLibraryUIUnits.collectionViewItemSpacing;
+    const NSEdgeInsets collectionViewSectionInset = VLCLibraryUIUnits.collectionViewSectionInsets;
+
+    VLCLibraryCollectionViewFlowLayout * const collectionViewLayout = [[VLCLibraryCollectionViewFlowLayout alloc] init];
+    collectionViewLayout.minimumLineSpacing = collectionItemSpacing;
+    collectionViewLayout.minimumInteritemSpacing = collectionItemSpacing;
+    collectionViewLayout.sectionInset = collectionViewSectionInset;
+
+    return collectionViewLayout;
+}
 
 - (instancetype)init
 {
@@ -276,7 +291,7 @@ static CVReturn detailViewAnimationCallback(CVDisplayLinkRef displayLink,
 {
     BOOL isLibrarySupplementaryView = NO;
 
-    if ([elementKind isEqualToString:VLCLibraryCollectionViewAlbumSupplementaryDetailViewKind] ||
+    if ([elementKind isEqualToString:VLCLibraryCollectionViewMediaItemListSupplementaryDetailViewKind] ||
                [elementKind isEqualToString:VLCLibraryCollectionViewMediaItemSupplementaryDetailViewKind]) {
 
         isLibrarySupplementaryView = YES;
@@ -321,7 +336,7 @@ static CVReturn detailViewAnimationCallback(CVDisplayLinkRef displayLink,
 
 - (NSSet<NSIndexPath *> *)indexPathsToDeleteForSupplementaryViewOfKind:(NSString *)elementKind
 {
-    if ([elementKind isEqualToString:VLCLibraryCollectionViewAlbumSupplementaryDetailViewKind] ||
+    if ([elementKind isEqualToString:VLCLibraryCollectionViewMediaItemListSupplementaryDetailViewKind] ||
         [elementKind isEqualToString:VLCLibraryCollectionViewMediaItemSupplementaryDetailViewKind]) {
 
         return [self.collectionView indexPathsForVisibleSupplementaryElementsOfKind:elementKind];

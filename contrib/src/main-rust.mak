@@ -49,14 +49,11 @@ ifneq ($(RUST_HOST),FAIL)
 # Supporting a Tier 3 platform means building an untested rust toolchain.
 # TODO Let's hope tvOS move from Tier 3 to Tier 2 before the VLC 4.0 release.
 ifneq ($(RUST_TARGET),FAIL)
+ifeq ($(call system_tool_matches_min, echo 'fn main() {}' | rustc --target=$(RUST_TARGET) --emit=dep-info - -o /dev/null 2>/dev/null && rustc --version,$(RUST_VERSION_MIN)),)
 BUILD_RUST="1"
 endif
 endif
-
-RUSTUP_HOME?= $(BUILDBINDIR)/.rustup
-CARGO_HOME ?= $(BUILDBINDIR)/.cargo
-
-RUST_ENV = RUSTUP_HOME=$(RUSTUP_HOME) CARGO_HOME=$(CARGO_HOME)
+endif
 
 RUSTFLAGS := -C panic=abort
 ifndef WITH_OPTIMIZATION
@@ -76,15 +73,8 @@ CARGO_ENV = TARGET_CC="$(CC)" TARGET_AR="$(AR)" TARGET_RANLIB="$(RANLIB)" \
 CARGO_ENV_NATIVE = TARGET_CC="$(BUILDCC)" TARGET_AR="$(BUILDAR)" TARGET_RANLIB="$(BUILDRANLIB)" \
 	TARGET_CFLAGS="$(BUILDCFLAGS)"
 
-ifneq ($(call system_tool_majmin, cargo --version),)
-CARGO = $(RUST_ENV) $(CARGO_ENV) cargo
-CARGO_NATIVE = $(RUST_ENV) $(CARGO_ENV_NATIVE) cargo
-else
-CARGO = . $(CARGO_HOME)/env && \
-        $(RUST_ENV) $(CARGO_ENV) cargo
-CARGO_NATIVE = . $(CARGO_HOME)/env && \
-        $(RUST_ENV) $(CARGO_ENV_NATIVE) cargo
-endif
+CARGO = $(CARGO_ENV) cargo
+CARGO_NATIVE = $(CARGO_ENV_NATIVE) cargo
 
 CARGO_INSTALL_ARGS = --target=$(RUST_TARGET) --prefix=$(PREFIX) \
 	--library-type staticlib --profile=$(CARGO_PROFILE)

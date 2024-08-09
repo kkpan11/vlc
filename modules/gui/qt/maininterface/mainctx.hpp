@@ -32,7 +32,6 @@
 #include "medialibrary/medialib.hpp"
 #include <playlist/playlist_common.hpp>
 
-#include <QSystemTrayIcon>
 #include <QtQuick/QQuickView>
 #include <QApplication>
 
@@ -61,6 +60,7 @@ class QMenu;
 class QSize;
 class QScreen;
 class QTimer;
+class QSystemTrayIcon;
 class StandardPLPanel;
 struct vlc_window;
 class VideoSurfaceProvider;
@@ -68,6 +68,7 @@ class ControlbarProfileModel;
 class SearchCtx;
 class SortCtx;
 class WorkerThreadSet;
+class VLCSystray;
 
 namespace vlc {
 namespace playlist {
@@ -158,8 +159,8 @@ public:
     inline qt_intf_t* getIntf() const { return p_intf; }
     bool smoothScroll() const { return m_smoothScroll; }
 
-    QSystemTrayIcon *getSysTray() { return sysTray; }
-    QMenu *getSysTrayMenu() { return systrayMenu.get(); }
+    VLCSystray* getSysTray() { return m_systray.get(); }
+
     enum
     {
         CONTROLS_VISIBLE  = 0x1,
@@ -189,8 +190,7 @@ public:
     };
     Q_ENUM(OsType)
 
-    inline bool isInterfaceFullScreen() const { return m_windowVisibility == QWindow::FullScreen; }
-    inline bool isInterfaceVisible() const { return m_windowVisibility != QWindow::Hidden; }
+    inline QWindow::Visibility interfaceVisibility() const { return m_windowVisibility; }
     bool isMediaLibraryVisible() { return m_mediaLibraryVisible; }
     bool isPlaylistDocked() { return b_playlistDocked; }
     bool isPlaylistVisible() { return m_playlistVisible; }
@@ -297,9 +297,7 @@ public:
 
 protected:
     /* Systray */
-    void createSystray();
     void initSystray();
-    void handleSystray();
 
     qt_intf_t* p_intf = nullptr;
 
@@ -309,8 +307,8 @@ protected:
 
     /* */
     QSettings           *settings = nullptr;
-    QSystemTrayIcon     *sysTray = nullptr;
-    std::unique_ptr<QMenu> systrayMenu;
+
+    std::unique_ptr<VLCSystray> m_systray;
 
     /* Flags */
     double               m_intfUserScaleFactor = 1.;
@@ -375,9 +373,6 @@ protected:
     mutable std::unique_ptr<WorkerThreadSet> m_workersThreads;
 
 public slots:
-    void toggleUpdateSystrayMenu();
-    void showUpdateSystrayMenu();
-    void hideUpdateSystrayMenu();
     void toggleToolbarMenu();
     void toggleInterfaceFullScreen();
     void setMediaLibraryVisible( bool );
@@ -410,10 +405,6 @@ public slots:
     VLCVarChoiceModel* getExtraInterfaces();
 
 protected slots:
-    void handleSystrayClick( QSystemTrayIcon::ActivationReason );
-    void updateSystrayTooltipName( const QString& );
-    void updateSystrayTooltipStatus( PlayerController::PlayingState );
-
     void onInputChanged( bool );
 
 signals:

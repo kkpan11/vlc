@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (C) 2020 VLC authors and VideoLAN
+ * Copyright (C) 2024 VLC authors and VideoLAN
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,15 +16,42 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
 
-import QtQuick
+#ifndef SYSTRAY_HPP
+#define SYSTRAY_HPP
 
-import VLC.Widgets as Widgets
-import VLC.Style
+#include <QWidget>
+#include <QSystemTrayIcon>
 
-Widgets.TableViewExt {
-    id: root
+class MainCtx;
+struct qt_intf_t;
 
-    displayMarginEnd: g_mainDisplay.displayMargin
+class VLCSystray : public QSystemTrayIcon
+{
+    Q_OBJECT
+public:
+    VLCSystray(MainCtx* ctx, QObject* parent = nullptr);
+    virtual ~VLCSystray();
 
-    fadingEdge.enableEndFade: (g_mainDisplay.hasMiniPlayer === false)
-}
+    bool isAvailableAndVisible() const;
+
+    void update();
+
+public slots:
+    void hideUpdateMenu();
+    void toggleUpdateMenu();
+    void showUpdateMenu();
+
+private slots:
+    void updateTooltipName( const QString& );
+    void handleClick( QSystemTrayIcon::ActivationReason );
+
+private:
+    MainCtx* m_ctx = nullptr;
+    qt_intf_t* m_intf = nullptr;
+
+    int m_notificationSetting = 0;
+
+    std::unique_ptr<QMenu> m_menu;
+};
+
+#endif // SYSTRAY_HPP

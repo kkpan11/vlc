@@ -806,6 +806,122 @@ static NSString *genreArrayDisplayString(NSArray<VLCMediaLibraryGenre *> * const
 
 @end
 
+@interface VLCMediaLibraryPlaylist ()
+{
+    NSArray<VLCMediaLibraryMediaItem *> *_mediaItems;
+}
+@end
+
+@implementation VLCMediaLibraryPlaylist
+
++ (instancetype)playlistForLibraryID:(int64_t)libraryID
+{
+    vlc_medialibrary_t * const p_mediaLibrary = getMediaLibrary();
+    if(!p_mediaLibrary) {
+        return nil;
+    }
+
+    vlc_ml_playlist_t * const p_playlist = vlc_ml_get_playlist(p_mediaLibrary, libraryID);
+    if (p_playlist == NULL) {
+        return nil;
+    }
+
+    return [[VLCMediaLibraryPlaylist alloc] initWithPlaylist:p_playlist];
+}
+
+- (instancetype)initWithPlaylist:(struct vlc_ml_playlist_t *)p_playlist
+{
+    self = [super init];
+    if (self && p_playlist != NULL) {
+        self.libraryID = p_playlist->i_id;
+        self.smallArtworkMRL = toNSStr(p_playlist->psz_artwork_mrl);
+        self.displayString = toNSStr(p_playlist->psz_name);
+        self.primaryDetailString = [NSString stringWithFormat:@"%u items", p_playlist->i_nb_media];
+        self.durationString = [NSString stringWithTime:p_playlist->i_duration / VLCMediaLibraryMediaItemDurationDenominator];
+
+        _MRL = toNSStr(p_playlist->psz_mrl);
+
+        _numberOfMedia = p_playlist->i_nb_media;
+        _numberOfAudios = p_playlist->i_nb_audio;
+        _numberOfVideos = p_playlist->i_nb_video;
+        _numberOfUnknowns = p_playlist->i_nb_unknown;
+
+        _numberOfPresentMedia = p_playlist->i_nb_present_media;
+        _numberOfPresentAudios = p_playlist->i_nb_present_audio;
+        _numberOfPresentVideos = p_playlist->i_nb_present_video;
+        _numberOfPresentUnknowns = p_playlist->i_nb_present_unknown;
+
+        _creationDate = [NSDate dateWithTimeIntervalSince1970:p_playlist->i_creation_date];
+
+        _duration = p_playlist->i_duration;
+        _numberDurationUnknown = p_playlist->i_nb_duration_unknown;
+
+        _readOnly = p_playlist->b_is_read_only;
+    }
+    return self;
+}
+
+- (void)fetchMediaItems
+{
+    NSMutableArray<VLCMediaLibraryMediaItem *> * const fetchedMediaItems = NSMutableArray.array;
+    vlc_ml_media_list_t * const p_media_list = vlc_ml_list_playlist_media(getMediaLibrary(), NULL, self.libraryID);
+
+    for (NSUInteger i = 0; i < p_media_list->i_nb_items; ++i) {
+        vlc_ml_media_t p_media_item = p_media_list->p_items[i];
+        VLCMediaLibraryMediaItem * const item = [[VLCMediaLibraryMediaItem alloc] initWithMediaItem:&p_media_item];
+        [fetchedMediaItems addObject:item];
+    }
+
+    vlc_ml_media_list_release(p_media_list);
+    _mediaItems = fetchedMediaItems.copy;
+}
+
+- (NSArray<VLCMediaLibraryMediaItem *> *)mediaItems
+{
+    if (_mediaItems == nil) {
+        [self fetchMediaItems];
+    }
+    return _mediaItems;
+}
+
+- (VLCMediaLibraryMediaItem *)firstMediaItem
+{
+    if (self.mediaItems == nil) {
+        [self fetchMediaItems];
+    }
+    return self.mediaItems.firstObject;
+}
+
+- (void)moveToTrash
+{
+    NSFileManager * const fileManager = NSFileManager.defaultManager;
+    NSURL * const URL = [NSURL URLWithString:_MRL];
+    [fileManager trashItemAtURL:URL
+               resultingItemURL:nil
+                          error:nil];
+}
+
+- (void)revealInFinder
+{
+    NSURL * const URL = [NSURL URLWithString:_MRL];
+    if (URL) {
+        [NSWorkspace.sharedWorkspace activateFileViewerSelectingURLs:@[URL]];
+    }
+}
+
+- (void)iterateMediaItemsWithBlock:(nonnull void (^)(VLCMediaLibraryMediaItem * _Nonnull))mediaItemBlock
+{
+    if (self.mediaItems == nil) {
+        [self fetchMediaItems];
+    }
+
+    for(VLCMediaLibraryMediaItem * const item in self.mediaItems) {
+        mediaItemBlock(item);
+    }
+}
+
+@end
+
 @interface VLCMediaLibraryMediaItem ()
 
 @property (readwrite, assign) vlc_medialibrary_t *p_mediaLibrary;

@@ -43,6 +43,7 @@
 #include "playlist/playlist_controller.hpp"
 #include "dialogs/extensions/extensions_manager.hpp"                 /* Extensions menu */
 #include "dialogs/extended/extended_panels.hpp"
+#include "dialogs/systray/systray.hpp"
 #include "util/varchoicemodel.hpp"
 #include "medialibrary/medialib.hpp"
 #include "medialibrary/mlrecentsmodel.hpp"
@@ -224,10 +225,11 @@ void VLCMenuBar::FileMenu(qt_intf_t *p_intf, QMenu *menu)
     action->setCheckable( true );
     action->setChecked( THEMPL->getMediaStopAction() ==  PlaylistController::MEDIA_STOPPED_EXIT);
 
-    if( mi && mi->getSysTray() )
+    VLCSystray* systray = mi ? mi->getSysTray() : nullptr;
+    if( systray )
     {
-        action = menu->addAction( qtr( "Close to systray"), mi,
-                                 &MainCtx::toggleUpdateSystrayMenu );
+        action = menu->addAction( qtr( "Close to systray"), systray,
+                                 &VLCSystray::toggleUpdateMenu );
     }
 
     addDPStaticEntry( menu, qtr( "&Quit" ) ,
@@ -343,7 +345,7 @@ void VLCMenuBar::ViewMenu( qt_intf_t *p_intf, QMenu *menu )
     action = menu->addAction( qtr( "&Fullscreen Interface" ), mi,
             &MainCtx::toggleInterfaceFullScreen, QString( "F11" ) );
     action->setCheckable( true );
-    action->setChecked( mi->isInterfaceFullScreen() );
+    action->setChecked( mi->interfaceVisibility() == QWindow::FullScreen );
 
     action = menu->addAction( qtr( "&View Items as Grid" ), mi,
             &MainCtx::setGridView );
@@ -396,7 +398,7 @@ void VLCMenuBar::ExtensionsMenu( qt_intf_t *p_intf, QMenu *extMenu )
     extMgr->menu( extMenu );
 }
 
-static inline void VolumeEntries( qt_intf_t *p_intf, QMenu *current )
+void VLCMenuBar::VolumeEntries( qt_intf_t *p_intf, QMenu *current )
 {
     current->addSeparator();
 
@@ -870,56 +872,6 @@ QMenu* VLCMenuBar::PopupMenu( qt_intf_t *p_intf, bool show )
         menu->popup( QCursor::pos() );
     return menu;
 }
-
-/************************************************************************
- * Systray Menu                                                         *
- ************************************************************************/
-
-void VLCMenuBar::updateSystrayMenu( MainCtx *mi,
-                                  qt_intf_t *p_intf,
-                                  bool b_force_visible )
-{
-    /* Get the systray menu and clean it */
-    QMenu *sysMenu = mi->getSysTrayMenu();
-    // explictly delete submenus, see QTBUG-11070
-    for (QAction *action : sysMenu->actions()) {
-        if (action->menu()) {
-            delete action->menu();
-        }
-    }
-    sysMenu->clear();
-
-#ifndef Q_OS_MAC
-    /* Hide / Show VLC and cone */
-    if( mi->isInterfaceVisible() || b_force_visible )
-    {
-        sysMenu->addAction( QIcon( ":/logo/vlc16.png" ),
-                            qtr( "&Hide VLC media player in taskbar" ), mi,
-                            &MainCtx::hideUpdateSystrayMenu);
-    }
-    else
-    {
-        sysMenu->addAction( QIcon( ":/logo/vlc16.png" ),
-                            qtr( "Sho&w VLC media player" ), mi,
-                            &MainCtx::showUpdateSystrayMenu);
-    }
-    sysMenu->addSeparator();
-#endif
-
-    PopupMenuPlaylistEntries( sysMenu, p_intf );
-    PopupMenuControlEntries( sysMenu, p_intf, false );
-
-    VolumeEntries( p_intf, sysMenu );
-    sysMenu->addSeparator();
-    addDPStaticEntry( sysMenu, qtr( "&Open Media" ),
-            ":/menu/file.svg", &DialogsProvider::openFileDialog);
-    addDPStaticEntry( sysMenu, qtr( "&Quit" ) ,
-            ":/menu/exit.svg", &DialogsProvider::quit);
-
-    /* Set the menu */
-    mi->getSysTray()->setContextMenu( sysMenu );
-}
-
 
 
 /*****************************************************************************

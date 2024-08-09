@@ -71,14 +71,10 @@ public:
     static QMenu* VideoPopupMenu( qt_intf_t *, bool );
     static QMenu* MiscPopupMenu( qt_intf_t *, bool );
 
-    /* Systray */
-    static void updateSystrayMenu( MainCtx *, qt_intf_t  *,
-                                   bool b_force_visible = false);
 
     /* destructor for parentless Menus (kept in static variables) */
     static void freeRendererMenu(){ delete rendererMenu; rendererMenu = NULL; }
 
-protected:
     /* All main Menus */
     static void FileMenu( qt_intf_t *, QMenu * );
 
@@ -106,6 +102,8 @@ protected:
     static void PopupMenuPlaylistEntries( QMenu *menu, qt_intf_t *p_intf );
     static void PopupMenuPlaylistControlEntries( QMenu *menu, qt_intf_t *p_intf );
     static void PopupMenuControlEntries( QMenu *menu, qt_intf_t *p_intf, bool b = true );
+
+    static void VolumeEntries( qt_intf_t *p_intf, QMenu *current );
 
     /* recentMRL menu */
     static RendererMenu *rendererMenu;

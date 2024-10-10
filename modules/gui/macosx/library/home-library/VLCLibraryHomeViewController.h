@@ -24,7 +24,6 @@
 
 #import "library/VLCLibraryAbstractSegmentViewController.h"
 
-@class VLCLoadingOverlayView;
 @class VLCLibraryWindow;
 @class VLCLibraryHomeViewStackViewController;
 
@@ -40,7 +39,6 @@ NS_ASSUME_NONNULL_BEGIN
 @property (readonly, weak) NSScrollView *homeLibraryStackViewScrollView;
 @property (readonly, weak) NSStackView *homeLibraryStackView;
 
-@property (readonly) VLCLoadingOverlayView *loadingOverlayView;
 @property (readonly) VLCLibraryHomeViewStackViewController *stackViewController;
 
 - (instancetype)initWithLibraryWindow:(VLCLibraryWindow *)libraryWindow;

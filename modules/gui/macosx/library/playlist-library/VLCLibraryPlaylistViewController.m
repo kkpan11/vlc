@@ -43,7 +43,6 @@
 
 #import "main/VLCMain.h"
 
-#import "views/VLCLoadingOverlayView.h"
 
 #import "windows/video/VLCMainVideoViewController.h"
 
@@ -214,42 +213,6 @@
     ];
 }
 
-- (void)setupLoadingOverlayView
-{
-    _loadingOverlayView = [[VLCLoadingOverlayView alloc] init];
-    self.loadingOverlayView.translatesAutoresizingMaskIntoConstraints = NO;
-    _loadingOverlayViewConstraints = @[
-        [NSLayoutConstraint constraintWithItem:self.loadingOverlayView
-                                     attribute:NSLayoutAttributeTop
-                                     relatedBy:NSLayoutRelationEqual
-                                        toItem:self.libraryTargetView
-                                     attribute:NSLayoutAttributeTop
-                                    multiplier:1
-                                      constant:0],
-        [NSLayoutConstraint constraintWithItem:self.loadingOverlayView
-                                     attribute:NSLayoutAttributeRight
-                                     relatedBy:NSLayoutRelationEqual
-                                        toItem:self.libraryTargetView
-                                     attribute:NSLayoutAttributeRight
-                                    multiplier:1
-                                      constant:0],
-        [NSLayoutConstraint constraintWithItem:self.loadingOverlayView
-                                     attribute:NSLayoutAttributeBottom
-                                     relatedBy:NSLayoutRelationEqual
-                                        toItem:self.libraryTargetView
-                                     attribute:NSLayoutAttributeBottom
-                                    multiplier:1
-                                      constant:0],
-        [NSLayoutConstraint constraintWithItem:self.loadingOverlayView
-                                     attribute:NSLayoutAttributeLeft
-                                     relatedBy:NSLayoutRelationEqual
-                                        toItem:self.libraryTargetView
-                                     attribute:NSLayoutAttributeLeft
-                                    multiplier:1
-                                      constant:0]
-    ];
-}
-
 - (NSArray<NSLayoutConstraint *> *)placeholderImageViewSizeConstraints
 {
     return _internalPlaceholderImageViewSizeConstraints;
@@ -260,26 +223,8 @@
     return self.dataSource;
 }
 
-// TODO: This is duplicated almost verbatim across all the library view
-// controllers. Ideally we should have the placeholder view handle this
-// itself, or move this into a common superclass
 - (void)presentPlaceholderPlaylistLibraryView
 {
-    NSArray<NSLayoutConstraint *> * const oldViewPlaceholderConstraints =
-        self.libraryWindow.librarySegmentViewController.placeholderImageViewSizeConstraints;
-    for (NSLayoutConstraint * const constraint in oldViewPlaceholderConstraints) {
-        constraint.active = NO;
-    }
-    for (NSLayoutConstraint * const constraint in self.placeholderImageViewSizeConstraints) {
-        constraint.active = YES;
-    }
-
-    self.libraryWindow.emptyLibraryView.translatesAutoresizingMaskIntoConstraints = NO;
-    self.libraryWindow.libraryTargetView.subviews = @[self.libraryWindow.emptyLibraryView];
-    NSDictionary * const dict = @{@"emptyLibraryView": self.libraryWindow.emptyLibraryView};
-    [self.libraryWindow.libraryTargetView addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|[emptyLibraryView(>=572.)]|" options:0 metrics:0 views:dict]];
-    [self.libraryWindow.libraryTargetView addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"V:|[emptyLibraryView(>=444.)]|" options:0 metrics:0 views:dict]];
-
     const vlc_ml_playlist_type_t playlistType = self.dataSource.playlistType;
     NSString *placeholderPlaylistsString = nil;
     switch (playlistType) {
@@ -302,8 +247,9 @@
             break;
     }
 
-    self.libraryWindow.placeholderImageView.image = [NSImage imageNamed:@"placeholder-group2"];
-    self.libraryWindow.placeholderLabel.stringValue = placeholderPlaylistsString;
+    [self.libraryWindow displayLibraryPlaceholderViewWithImage:[NSImage imageNamed:@"placeholder-group2"]
+                                              usingConstraints:self.placeholderImageViewSizeConstraints
+                                             displayingMessage:placeholderPlaylistsString];
 }
 
 - (void)presentPlaylistLibraryView
@@ -318,30 +264,24 @@
         viewToPresent = self.listViewSplitView;
     }
     NSParameterAssert(viewToPresent != nil);
-
-    self.libraryTargetView.subviews = @[viewToPresent];
-    [NSLayoutConstraint activateConstraints:@[
-        [self.libraryTargetView.topAnchor constraintEqualToAnchor:viewToPresent.topAnchor],
-        [self.libraryTargetView.bottomAnchor constraintEqualToAnchor:viewToPresent.bottomAnchor],
-        [self.libraryTargetView.leadingAnchor constraintEqualToAnchor:viewToPresent.leadingAnchor],
-        [self.libraryTargetView.trailingAnchor constraintEqualToAnchor:viewToPresent.trailingAnchor]
-    ]];
+    [self.libraryWindow displayLibraryView:viewToPresent];
 }
 
 - (void)updatePresentedView
 {
     const vlc_ml_playlist_type_t playlistType = self.dataSource.playlistType;
     VLCLibraryModel * const libraryModel = VLCMain.sharedInstance.libraryController.libraryModel;
-    if ([libraryModel numberOfPlaylistsOfType:playlistType] <= 0) {
-        [self presentPlaceholderPlaylistLibraryView];
-    } else {
+    if ([libraryModel numberOfPlaylistsOfType:playlistType] > 0) {
         [self presentPlaylistLibraryView];
+    } else if (self.dataSource.libraryModel.filterString.length > 0) {
+        [self.libraryWindow displayNoResultsMessage];
+    } else {
+        [self presentPlaceholderPlaylistLibraryView];
     }
 }
 
 - (void)presentPlaylistsView
 {
-    self.libraryWindow.libraryTargetView.subviews = @[];
     [self updatePresentedView];
 }
 
@@ -368,54 +308,20 @@
     }
 }
 
-// TODO: Duplicated a lot, move to abstract view controller?
 - (void)libraryModelLongLoadStarted:(NSNotification *)notification
 {
-    if ([self.libraryTargetView.subviews containsObject:self.loadingOverlayView]) {
-        return;
-    }
-
     if (self.connected) {
         [self.dataSource disconnect];
     }
-
-    self.loadingOverlayView.wantsLayer = YES;
-    self.loadingOverlayView.alphaValue = 0.0;
-
-    NSArray * const views = [self.libraryTargetView.subviews arrayByAddingObject:self.loadingOverlayView];
-    self.libraryTargetView.subviews = views;
-    [self.libraryTargetView addConstraints:_loadingOverlayViewConstraints];
-
-    [NSAnimationContext runAnimationGroup:^(NSAnimationContext * const context) {
-        context.duration = 0.5;
-        self.loadingOverlayView.animator.alphaValue = 1.0;
-    } completionHandler:nil];
-    [self.loadingOverlayView.indicator startAnimation:self];
+    [self.libraryWindow showLoadingOverlay];
 }
 
 - (void)libraryModelLongLoadFinished:(NSNotification *)notification
 {
-    if (![self.libraryTargetView.subviews containsObject:self.loadingOverlayView]) {
-        return;
-    }
-
     if (self.connected) {
         [self.dataSource connect];
     }
-
-    self.loadingOverlayView.wantsLayer = YES;
-    self.loadingOverlayView.alphaValue = 1.0;
-
-    [NSAnimationContext runAnimationGroup:^(NSAnimationContext * const context) {
-        context.duration = 1.0;
-        self.loadingOverlayView.animator.alphaValue = 0.0;
-    } completionHandler:^{
-        [self.libraryTargetView removeConstraints:_loadingOverlayViewConstraints];
-        NSMutableArray * const views = self.libraryTargetView.subviews.mutableCopy;
-        [views removeObject:self.loadingOverlayView];
-        self.libraryTargetView.subviews = views.copy;
-        [self.loadingOverlayView.indicator stopAnimation:self];
-    }];
+    [self.libraryWindow hideLoadingOverlay];
 }
 
 #pragma mark - NSSplitViewDelegate

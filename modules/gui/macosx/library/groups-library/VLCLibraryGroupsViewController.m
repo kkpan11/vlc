@@ -230,51 +230,27 @@
 
 - (void)presentPlaceholderGroupsView
 {
-    NSArray<NSLayoutConstraint *> * const oldViewPlaceholderConstraints =
-        self.libraryWindow.librarySegmentViewController.placeholderImageViewSizeConstraints;
-    for (NSLayoutConstraint * const constraint in oldViewPlaceholderConstraints) {
-        constraint.active = NO;
-    }
-    for (NSLayoutConstraint *constraint in self.placeholderImageViewSizeConstraints) {
-        constraint.active = YES;
-    }
-
-    self.emptyLibraryView.translatesAutoresizingMaskIntoConstraints = NO;
-    self.libraryTargetView.subviews = @[self.emptyLibraryView];
-    NSView * const emptyLibraryView = self.emptyLibraryView;
-    NSDictionary * const dict = NSDictionaryOfVariableBindings(emptyLibraryView);
-    [self.libraryTargetView addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|[emptyLibraryView(>=572.)]|" options:0 metrics:0 views:dict]];
-    [self.libraryTargetView addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"V:|[emptyLibraryView(>=444.)]|" options:0 metrics:0 views:dict]];
-
-    self.placeholderImageView.image = [NSImage imageNamed:@"placeholder-video"];
-    self.placeholderLabel.stringValue = _NS("Your favorite groups will appear here.");
+    [self.libraryWindow displayLibraryPlaceholderViewWithImage:[NSImage imageNamed:@"placeholder-video"]
+                                              usingConstraints:self.placeholderImageViewSizeConstraints
+                                             displayingMessage:_NS("Your favorite groups will appear here.")];
 }
 
 - (void)presentGroupsView
 {
-    if (self.dataSource.libraryModel.numberOfGroups == 0) {
-        [self presentPlaceholderGroupsView];
-        return;
-    }
-
     const VLCLibraryViewModeSegment viewModeSegment =
         VLCLibraryWindowPersistentPreferences.sharedInstance.groupsLibraryViewMode;
-    NSView *viewToPresent = nil;
 
-    if (viewModeSegment == VLCLibraryGridViewModeSegment) {
-        viewToPresent = self.collectionViewScrollView;
+    if (self.dataSource.libraryModel.numberOfGroups > 0) {
+        if (viewModeSegment == VLCLibraryGridViewModeSegment) {
+            [self.libraryWindow displayLibraryView:self.collectionViewScrollView];
+        } else {
+            [self.libraryWindow displayLibraryView:self.listViewSplitView];
+        }
+    } else if (self.dataSource.libraryModel.filterString.length > 0) {
+        [self.libraryWindow displayNoResultsMessage];
     } else {
-        viewToPresent = self.listViewSplitView;
+        [self presentPlaceholderGroupsView];
     }
-    NSParameterAssert(viewToPresent != nil);
-
-    self.libraryTargetView.subviews = @[viewToPresent];
-    [NSLayoutConstraint activateConstraints:@[
-        [self.libraryTargetView.topAnchor constraintEqualToAnchor:viewToPresent.topAnchor],
-        [self.libraryTargetView.bottomAnchor constraintEqualToAnchor:viewToPresent.bottomAnchor],
-        [self.libraryTargetView.leadingAnchor constraintEqualToAnchor:viewToPresent.leadingAnchor],
-        [self.libraryTargetView.trailingAnchor constraintEqualToAnchor:viewToPresent.trailingAnchor]
-    ]];
 }
 
 - (void)presentGroup:(VLCMediaLibraryGroup *)group

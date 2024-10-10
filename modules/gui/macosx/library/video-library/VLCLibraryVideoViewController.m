@@ -50,9 +50,6 @@
 
 #import "main/VLCMain.h"
 
-#import "views/VLCLoadingOverlayView.h"
-#import "views/VLCNoResultsLabel.h"
-
 #import "windows/video/VLCVoutView.h"
 #import "windows/video/VLCMainVideoViewController.h"
 
@@ -66,9 +63,6 @@
     id<VLCMediaLibraryItemProtocol> _awaitingPresentingLibraryItem;
 
     NSArray<NSLayoutConstraint *> *_internalPlaceholderImageViewSizeConstraints;
-    NSArray<NSLayoutConstraint *> *_loadingOverlayViewConstraints;
-
-    VLCNoResultsLabel *_noResultsLabel;
 }
 @end
 
@@ -87,7 +81,6 @@
         [self setupCollectionView];
         [self setupVideoPlaceholderView];
         [self setupVideoLibraryViews];
-        [self setupLoadingOverlayView];
 
         NSNotificationCenter *notificationCenter = NSNotificationCenter.defaultCenter;
         [notificationCenter addObserver:self
@@ -248,42 +241,6 @@
     _videoLibraryGroupSelectionTableViewScrollView.scrollerInsets = scrollerInsets;
 }
 
-- (void)setupLoadingOverlayView
-{
-    _loadingOverlayView = [[VLCLoadingOverlayView alloc] init];
-    self.loadingOverlayView.translatesAutoresizingMaskIntoConstraints = NO;
-    _loadingOverlayViewConstraints = @[
-        [NSLayoutConstraint constraintWithItem:self.loadingOverlayView
-                                     attribute:NSLayoutAttributeTop
-                                     relatedBy:NSLayoutRelationEqual
-                                        toItem:self.libraryTargetView
-                                     attribute:NSLayoutAttributeTop
-                                    multiplier:1
-                                      constant:0],
-        [NSLayoutConstraint constraintWithItem:self.loadingOverlayView
-                                     attribute:NSLayoutAttributeRight
-                                     relatedBy:NSLayoutRelationEqual
-                                        toItem:self.libraryTargetView
-                                     attribute:NSLayoutAttributeRight
-                                    multiplier:1
-                                      constant:0],
-        [NSLayoutConstraint constraintWithItem:self.loadingOverlayView
-                                     attribute:NSLayoutAttributeBottom
-                                     relatedBy:NSLayoutRelationEqual
-                                        toItem:self.libraryTargetView
-                                     attribute:NSLayoutAttributeBottom
-                                    multiplier:1
-                                      constant:0],
-        [NSLayoutConstraint constraintWithItem:self.loadingOverlayView
-                                     attribute:NSLayoutAttributeLeft
-                                     relatedBy:NSLayoutRelationEqual
-                                        toItem:self.libraryTargetView
-                                     attribute:NSLayoutAttributeLeft
-                                    multiplier:1
-                                      constant:0]
-    ];
-}
-
 #pragma mark - Show the video library view
 
 - (NSArray<NSLayoutConstraint *> *)placeholderImageViewSizeConstraints
@@ -324,7 +281,7 @@
         const VLCLibraryViewModeSegment viewModeSegment = VLCLibraryWindowPersistentPreferences.sharedInstance.videoLibraryViewMode;
         [self presentVideoLibraryView:viewModeSegment];
     } else if (self.libraryVideoDataSource.libraryModel.filterString.length > 0) {
-        [self presentNoResultsView];
+        [self.libraryWindow displayNoResultsMessage];
     } else {
         [self presentPlaceholderVideoLibraryView];
     }
@@ -351,7 +308,7 @@
         const VLCLibraryViewModeSegment viewModeSegment = VLCLibraryWindowPersistentPreferences.sharedInstance.showsLibraryViewMode;
         [self presentVideoLibraryView:viewModeSegment];
     } else if (self.libraryShowsDataSource.libraryModel.filterString.length > 0) {
-        [self presentNoResultsView];
+        [self.libraryWindow displayNoResultsMessage];
     } else {
         [self presentPlaceholderVideoLibraryView];
     }
@@ -359,80 +316,30 @@
 
 - (void)presentVideoView
 {
-    self.libraryTargetView.subviews = @[];
     [self updatePresentedVideoLibraryView];
 }
 
 - (void)presentShowsView
 {
-    self.libraryTargetView.subviews = @[];
     [self updatePresentedShowsLibraryView];
 }
 
 - (void)presentPlaceholderVideoLibraryView
 {
-    NSArray<NSLayoutConstraint *> * const oldViewPlaceholderConstraints =
-        self.libraryWindow.librarySegmentViewController.placeholderImageViewSizeConstraints;
-    for (NSLayoutConstraint * const constraint in oldViewPlaceholderConstraints) {
-        constraint.active = NO;
-    }
-    for (NSLayoutConstraint * const constraint in self.placeholderImageViewSizeConstraints) {
-        constraint.active = YES;
-    }
-
-    self.emptyLibraryView.translatesAutoresizingMaskIntoConstraints = NO;
-    if ([self.libraryTargetView.subviews containsObject:self.loadingOverlayView]) {
-        self.libraryTargetView.subviews = @[self.emptyLibraryView, self.loadingOverlayView];
-    } else {
-        self.libraryTargetView.subviews = @[self.emptyLibraryView];
-    }
-    NSView * const emptyLibraryView = self.emptyLibraryView;
-    NSDictionary *dict = NSDictionaryOfVariableBindings(emptyLibraryView);
-    [self.libraryTargetView addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|[emptyLibraryView(>=572.)]|" options:0 metrics:0 views:dict]];
-    [self.libraryTargetView addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"V:|[emptyLibraryView(>=444.)]|" options:0 metrics:0 views:dict]];
-
-    self.placeholderImageView.image = [NSImage imageNamed:@"placeholder-video"];
-    self.placeholderLabel.stringValue = _NS("Your favorite videos will appear here.\nGo to the Browse section to add videos you love.");
-}
-
-- (void)presentNoResultsView
-{
-    if (_noResultsLabel == nil) {
-        _noResultsLabel = [[VLCNoResultsLabel alloc] init];
-        _noResultsLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    }
-
-    if ([self.libraryTargetView.subviews containsObject:self.loadingOverlayView]) {
-        self.libraryTargetView.subviews = @[_noResultsLabel, self.loadingOverlayView];
-    } else {
-        self.libraryTargetView.subviews = @[_noResultsLabel];
-    }
-
-    [NSLayoutConstraint activateConstraints:@[
-        [_noResultsLabel.centerXAnchor constraintEqualToAnchor:self.libraryTargetView.centerXAnchor],
-        [_noResultsLabel.centerYAnchor constraintEqualToAnchor:self.libraryTargetView.centerYAnchor]
-    ]];
+    [self.libraryWindow displayLibraryPlaceholderViewWithImage:[NSImage imageNamed:@"placeholder-video"]
+                                              usingConstraints:self.placeholderImageViewSizeConstraints
+                                             displayingMessage:_NS("Your favorite videos will appear here.\nGo to the Browse section to add videos you love.")];
 }
 
 - (void)presentVideoLibraryView:(VLCLibraryViewModeSegment)viewModeSegment
 {
-    _videoLibraryView.translatesAutoresizingMaskIntoConstraints = NO;
-    if ([self.libraryTargetView.subviews containsObject:self.loadingOverlayView]) {
-        self.libraryTargetView.subviews = @[self.videoLibraryView, self.loadingOverlayView];
-    } else {
-        self.libraryTargetView.subviews = @[self.videoLibraryView];
-    }
-
-    NSDictionary *dict = NSDictionaryOfVariableBindings(_videoLibraryView);
-    [self.libraryTargetView addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|[_videoLibraryView(>=572.)]|" options:0 metrics:0 views:dict]];
-    [self.libraryTargetView addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"V:|[_videoLibraryView(>=444.)]|" options:0 metrics:0 views:dict]];
-
+    [self.libraryWindow displayLibraryView:self.videoLibraryView];
     if (viewModeSegment == VLCLibraryGridViewModeSegment) {
-        _videoLibrarySplitView.hidden = YES;
-        _videoLibraryCollectionViewScrollView.hidden = NO;
+        self.videoLibrarySplitView.hidden = YES;
+        self.videoLibraryCollectionViewScrollView.hidden = NO;
     } else if (viewModeSegment == VLCLibraryListViewModeSegment) {
-        _videoLibrarySplitView.hidden = NO;
-        _videoLibraryCollectionViewScrollView.hidden = YES;
+        self.videoLibrarySplitView.hidden = NO;
+        self.videoLibraryCollectionViewScrollView.hidden = YES;
     } else {
         NSAssert(false, @"View mode must be grid or list mode");
     }
@@ -515,51 +422,18 @@
 
 - (void)libraryModelLongLoadStarted:(NSNotification *)notification
 {
-    if ([self.libraryTargetView.subviews containsObject:self.loadingOverlayView]) {
-        return;
-    }
-
     if (self.connected) {
         [self.libraryVideoDataSource disconnect];
     }
-
-    self.loadingOverlayView.wantsLayer = YES;
-    self.loadingOverlayView.alphaValue = 0.0;
-
-    NSArray * const views = [self.libraryTargetView.subviews arrayByAddingObject:self.loadingOverlayView];
-    self.libraryTargetView.subviews = views;
-    [self.libraryTargetView addConstraints:_loadingOverlayViewConstraints];
-
-    [NSAnimationContext runAnimationGroup:^(NSAnimationContext * const context) {
-        context.duration = 0.5;
-        self.loadingOverlayView.animator.alphaValue = 1.0;
-    } completionHandler:nil];
-    [self.loadingOverlayView.indicator startAnimation:self];
+    [self.libraryWindow showLoadingOverlay];
 }
 
 - (void)libraryModelLongLoadFinished:(NSNotification *)notification
 {
-    if (![self.libraryTargetView.subviews containsObject:self.loadingOverlayView]) {
-        return;
-    }
-
     if (self.connected) {
         [self.libraryVideoDataSource connect];
     }
-
-    self.loadingOverlayView.wantsLayer = YES;
-    self.loadingOverlayView.alphaValue = 1.0;
-
-    [NSAnimationContext runAnimationGroup:^(NSAnimationContext * const context) {
-        context.duration = 1.0;
-        self.loadingOverlayView.animator.alphaValue = 0.0;
-    } completionHandler:^{
-        [self.libraryTargetView removeConstraints:_loadingOverlayViewConstraints];
-        NSMutableArray * const views = self.libraryTargetView.subviews.mutableCopy;
-        [views removeObject:self.loadingOverlayView];
-        self.libraryTargetView.subviews = views.copy;
-        [self.loadingOverlayView.indicator stopAnimation:self];
-    }];
+    [self.libraryWindow hideLoadingOverlay];
 }
 
 @end

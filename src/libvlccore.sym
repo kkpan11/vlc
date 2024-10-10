@@ -244,8 +244,6 @@ libvlc_InternalDestroy
 libvlc_InternalInit
 libvlc_Quit
 libvlc_SetExitHandler
-libvlc_MetadataRequest
-libvlc_MetadataCancel
 vlc_UrlParse
 vlc_UrlParseFixup
 vlc_UrlClean
@@ -1007,6 +1005,7 @@ vlc_playlist_Preparse
 vlc_playlist_Export
 vlc_playlist_SetMediaStoppedAction
 vlc_intf_GetMainPlaylist
+libvlc_GetMainPreparser
 vlc_media_source_Hold
 vlc_media_source_Release
 vlc_media_source_provider_Get
@@ -1026,7 +1025,6 @@ vlc_media_tree_Add
 vlc_media_tree_Remove
 vlc_media_tree_Find
 vlc_media_tree_Preparse
-vlc_media_tree_PreparseCancel
 vlc_viewpoint_to_4x4
 vlc_viewpoint_from_orientation
 vlc_video_context_Create

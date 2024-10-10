@@ -43,6 +43,40 @@
  */
 typedef struct vlc_preparser_t vlc_preparser_t;
 
+typedef enum input_item_meta_request_option_t
+{
+    META_REQUEST_OPTION_NONE          = 0x00,
+    META_REQUEST_OPTION_SCOPE_LOCAL   = 0x01,
+    META_REQUEST_OPTION_SCOPE_NETWORK = 0x02,
+    META_REQUEST_OPTION_SCOPE_ANY     =
+        META_REQUEST_OPTION_SCOPE_LOCAL|META_REQUEST_OPTION_SCOPE_NETWORK,
+    META_REQUEST_OPTION_SCOPE_FORCED  = 0x04,
+    META_REQUEST_OPTION_FETCH_LOCAL   = 0x08,
+    META_REQUEST_OPTION_FETCH_NETWORK = 0x10,
+    META_REQUEST_OPTION_FETCH_ANY     =
+        META_REQUEST_OPTION_FETCH_LOCAL|META_REQUEST_OPTION_FETCH_NETWORK,
+    META_REQUEST_OPTION_DO_INTERACT   = 0x20,
+    META_REQUEST_OPTION_PARSE_SUBITEMS = 0x40,
+} input_item_meta_request_option_t;
+
+/* status of the on_preparse_ended() callback */
+enum input_item_preparse_status
+{
+    ITEM_PREPARSE_SKIPPED,
+    ITEM_PREPARSE_FAILED,
+    ITEM_PREPARSE_TIMEOUT,
+    ITEM_PREPARSE_DONE
+};
+
+struct vlc_metadata_cbs {
+    void (*on_preparse_ended)(input_item_t *, enum input_item_preparse_status status, void *userdata);
+    void (*on_art_fetch_ended)(input_item_t *, bool fetched, void *userdata);
+    void (*on_subtree_added)(input_item_t *, input_item_node_t *subtree, void *userdata);
+    void (*on_attachments_added)(input_item_t *item,
+                                 input_attachment_t *const *array,
+                                 size_t count, void *userdata);
+};
+
 /**
  * This function creates the preparser object and thread.
  *
@@ -102,6 +136,14 @@ VLC_API void vlc_preparser_Delete( vlc_preparser_t *preparser );
  * @param preparser the preparser object
  */
 VLC_API void vlc_preparser_Deactivate( vlc_preparser_t *preparser );
+
+/**
+ * Recover the main preparser from libvlc
+ *
+ * @param libvlc valid libvlc object
+ * @return the main preparser (can be NULL)
+ */
+VLC_API vlc_preparser_t *libvlc_GetMainPreparser(libvlc_int_t *libvlc);
 
 /** @} vlc_preparser */
 

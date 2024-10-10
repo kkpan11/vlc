@@ -71,6 +71,8 @@
 #import "views/VLCBottomBarView.h"
 #import "views/VLCCustomWindowButton.h"
 #import "views/VLCDragDropView.h"
+#import "views/VLCLoadingOverlayView.h"
+#import "views/VLCNoResultsLabel.h"
 #import "views/VLCRoundedCornerTextField.h"
 
 #import "windows/controlsbar/VLCControlsBarCommon.h"
@@ -186,15 +188,12 @@ static void addShadow(NSImageView *__unsafe_unretained imageView)
     _libraryMediaSourceViewController = [[VLCLibraryMediaSourceViewController alloc] initWithLibraryWindow:self];
 
     [self setViewForSelectedSegment];
+    [self setupLoadingOverlayView];
 }
 
 - (void)dealloc
 {
     [NSNotificationCenter.defaultCenter removeObserver:self];
-    if (@available(macOS 10.14, *)) {
-        [NSApplication.sharedApplication removeObserver:self forKeyPath:@"effectiveAppearance"];
-    }
-
     libvlc_int_t *libvlc = vlc_object_instance(getIntf());
     var_DelCallback(libvlc, "intf-toggle-fscontrol", ShowFullscreenController, (__bridge void *)self);
     var_DelCallback(libvlc, "intf-show", ShowController, (__bridge void *)self);
@@ -204,6 +203,42 @@ static void addShadow(NSImageView *__unsafe_unretained imageView)
 {
     [super encodeRestorableStateWithCoder:coder];
     [coder encodeInteger:_librarySegmentType forKey:@"macosx-library-selected-segment"];
+}
+
+- (void)setupLoadingOverlayView
+{
+    _loadingOverlayView = [[VLCLoadingOverlayView alloc] init];
+    self.loadingOverlayView.translatesAutoresizingMaskIntoConstraints = NO;
+    _loadingOverlayViewConstraints = @[
+        [NSLayoutConstraint constraintWithItem:self.loadingOverlayView
+                                     attribute:NSLayoutAttributeTop
+                                     relatedBy:NSLayoutRelationEqual
+                                        toItem:self.libraryTargetView
+                                     attribute:NSLayoutAttributeTop
+                                    multiplier:1
+                                      constant:0],
+        [NSLayoutConstraint constraintWithItem:self.loadingOverlayView
+                                     attribute:NSLayoutAttributeRight
+                                     relatedBy:NSLayoutRelationEqual
+                                        toItem:self.libraryTargetView
+                                     attribute:NSLayoutAttributeRight
+                                    multiplier:1
+                                      constant:0],
+        [NSLayoutConstraint constraintWithItem:self.loadingOverlayView
+                                     attribute:NSLayoutAttributeBottom
+                                     relatedBy:NSLayoutRelationEqual
+                                        toItem:self.libraryTargetView
+                                     attribute:NSLayoutAttributeBottom
+                                    multiplier:1
+                                      constant:0],
+        [NSLayoutConstraint constraintWithItem:self.loadingOverlayView
+                                     attribute:NSLayoutAttributeLeft
+                                     relatedBy:NSLayoutRelationEqual
+                                        toItem:self.libraryTargetView
+                                     attribute:NSLayoutAttributeLeft
+                                    multiplier:1
+                                      constant:0]
+    ];
 }
 
 #pragma mark - misc. user interactions
@@ -447,6 +482,59 @@ static void addShadow(NSImageView *__unsafe_unretained imageView)
         [[VLCLibraryGroupsViewController alloc] initWithLibraryWindow:self];
     [lvc presentGroupsView];
     _librarySegmentViewController = lvc;
+}
+
+- (void)displayLibraryView:(NSView *)view
+{
+    view.translatesAutoresizingMaskIntoConstraints = NO;
+    if ([self.libraryTargetView.subviews containsObject:self.loadingOverlayView]) {
+        self.libraryTargetView.subviews = @[view, self.loadingOverlayView];
+    } else {
+        self.libraryTargetView.subviews = @[view];
+    }
+
+    [NSLayoutConstraint activateConstraints:@[
+        [view.topAnchor constraintEqualToAnchor:self.libraryTargetView.topAnchor],
+        [view.bottomAnchor constraintEqualToAnchor:self.libraryTargetView.bottomAnchor],
+        [view.leftAnchor constraintEqualToAnchor:self.libraryTargetView.leftAnchor],
+        [view.rightAnchor constraintEqualToAnchor:self.libraryTargetView.rightAnchor]
+    ]];
+}
+
+- (void)displayLibraryPlaceholderViewWithImage:(NSImage *)image
+                              usingConstraints:(NSArray<NSLayoutConstraint *> *)constraints
+                             displayingMessage:(NSString *)message
+{
+    for (NSLayoutConstraint * const constraint in self.placeholderImageViewConstraints) {
+        constraint.active = NO;
+    }
+    _placeholderImageViewConstraints = constraints;
+    for (NSLayoutConstraint * const constraint in constraints) {
+        constraint.active = YES;
+    }
+
+    [self displayLibraryView:self.emptyLibraryView];
+    self.placeholderImageView.image = image;
+    self.placeholderLabel.stringValue = message;
+}
+
+- (void)displayNoResultsMessage
+{
+    if (self.noResultsLabel == nil) {
+        _noResultsLabel = [[VLCNoResultsLabel alloc] init];
+        _noResultsLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    }
+    
+    if ([self.libraryTargetView.subviews containsObject:self.loadingOverlayView]) {
+        self.libraryTargetView.subviews = @[self.noResultsLabel, self.loadingOverlayView];
+    } else {
+        self.libraryTargetView.subviews = @[_noResultsLabel];
+    }
+
+    [NSLayoutConstraint activateConstraints:@[
+        [self.noResultsLabel.centerXAnchor constraintEqualToAnchor:self.libraryTargetView.centerXAnchor],
+        [self.noResultsLabel.centerYAnchor constraintEqualToAnchor:self.libraryTargetView.centerYAnchor]
+    ]];
 }
 
 - (void)presentAudioLibraryItem:(id<VLCMediaLibraryItemProtocol>)libraryItem
@@ -741,6 +829,48 @@ static void addShadow(NSImageView *__unsafe_unretained imageView)
     [self disableVideoTitleBarMode];
     [self showControlsBarImmediately];
     self.splitViewController.multifunctionSidebarViewController.mainVideoModeEnabled = NO;
+}
+
+- (void)showLoadingOverlay
+{
+    if ([self.libraryTargetView.subviews containsObject:self.loadingOverlayView]) {
+        return;
+    }
+
+    self.loadingOverlayView.wantsLayer = YES;
+    self.loadingOverlayView.alphaValue = 0.0;
+
+    NSArray * const views = [self.libraryTargetView.subviews arrayByAddingObject:self.loadingOverlayView];
+    self.libraryTargetView.subviews = views;
+    [self.libraryTargetView addConstraints:self.loadingOverlayViewConstraints];
+
+    [NSAnimationContext runAnimationGroup:^(NSAnimationContext * const context) {
+        context.duration = 0.5;
+        self.loadingOverlayView.animator.alphaValue = 1.0;
+    } completionHandler:nil];
+    [self.loadingOverlayView.indicator startAnimation:self];
+
+}
+
+- (void)hideLoadingOverlay
+{
+    if (![self.libraryTargetView.subviews containsObject:self.loadingOverlayView]) {
+        return;
+    }
+
+    self.loadingOverlayView.wantsLayer = YES;
+    self.loadingOverlayView.alphaValue = 1.0;
+
+    [NSAnimationContext runAnimationGroup:^(NSAnimationContext * const context) {
+        context.duration = 1.0;
+        self.loadingOverlayView.animator.alphaValue = 0.0;
+    } completionHandler:^{
+        [self.libraryTargetView removeConstraints:self.loadingOverlayViewConstraints];
+        NSMutableArray * const views = self.libraryTargetView.subviews.mutableCopy;
+        [views removeObject:self.loadingOverlayView];
+        self.libraryTargetView.subviews = views.copy;
+        [self.loadingOverlayView.indicator stopAnimation:self];
+    }];
 }
 
 - (void)mouseMoved:(NSEvent *)o_event

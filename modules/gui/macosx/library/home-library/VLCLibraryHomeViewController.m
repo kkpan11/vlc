@@ -43,15 +43,12 @@
 
 #import "main/VLCMain.h"
 
-#import "views/VLCLoadingOverlayView.h"
-
 #import "windows/video/VLCMainVideoViewController.h"
 
 @interface VLCLibraryHomeViewController ()
 {
     id<VLCMediaLibraryItemProtocol> _awaitingPresentingLibraryItem;
     NSMutableSet<NSString *> *_ongoingLongLoadingNotifications;
-    NSArray<NSLayoutConstraint *> *_loadingOverlayViewConstraints;
     NSArray<NSLayoutConstraint *> *_internalPlaceholderImageViewSizeConstraints;
 }
 @end
@@ -64,7 +61,6 @@
 
     if(self) {
         [self setupPropertiesFromLibraryWindow:libraryWindow];
-        [self setupLoadingOverlayView];
         [self setupGridViewController];
         [self setupHomePlaceholderView];
         [self setupHomeLibraryViews];
@@ -108,42 +104,6 @@
     _homeLibraryView = libraryWindow.homeLibraryView;
     _homeLibraryStackViewScrollView = libraryWindow.homeLibraryStackViewScrollView;
     _homeLibraryStackView = libraryWindow.homeLibraryStackView;
-}
-
-- (void)setupLoadingOverlayView
-{
-    _loadingOverlayView = [[VLCLoadingOverlayView alloc] init];
-    self.loadingOverlayView.translatesAutoresizingMaskIntoConstraints = NO;
-    _loadingOverlayViewConstraints = @[
-        [NSLayoutConstraint constraintWithItem:self.loadingOverlayView
-                                     attribute:NSLayoutAttributeTop
-                                     relatedBy:NSLayoutRelationEqual
-                                        toItem:self.libraryTargetView
-                                     attribute:NSLayoutAttributeTop
-                                    multiplier:1
-                                      constant:0],
-        [NSLayoutConstraint constraintWithItem:self.loadingOverlayView
-                                     attribute:NSLayoutAttributeRight
-                                     relatedBy:NSLayoutRelationEqual
-                                        toItem:self.libraryTargetView
-                                     attribute:NSLayoutAttributeRight
-                                    multiplier:1
-                                      constant:0],
-        [NSLayoutConstraint constraintWithItem:self.loadingOverlayView
-                                     attribute:NSLayoutAttributeBottom
-                                     relatedBy:NSLayoutRelationEqual
-                                        toItem:self.libraryTargetView
-                                     attribute:NSLayoutAttributeBottom
-                                    multiplier:1
-                                      constant:0],
-        [NSLayoutConstraint constraintWithItem:self.loadingOverlayView
-                                     attribute:NSLayoutAttributeLeft
-                                     relatedBy:NSLayoutRelationEqual
-                                        toItem:self.libraryTargetView
-                                     attribute:NSLayoutAttributeLeft
-                                    multiplier:1
-                                      constant:0]
-    ];
 }
 
 - (void)setupGridViewController
@@ -201,51 +161,19 @@
 
 - (void)presentHomeView
 {
-    self.libraryTargetView.subviews = @[];
     [self updatePresentedView];
 }
 
 - (void)presentPlaceholderHomeLibraryView
 {
-    NSArray<NSLayoutConstraint *> * const oldViewPlaceholderConstraints =
-        self.libraryWindow.librarySegmentViewController.placeholderImageViewSizeConstraints;
-    for (NSLayoutConstraint * const constraint in oldViewPlaceholderConstraints) {
-        constraint.active = NO;
-    }
-    for (NSLayoutConstraint *constraint in self.placeholderImageViewSizeConstraints) {
-        constraint.active = YES;
-    }
-
-    self.emptyLibraryView.translatesAutoresizingMaskIntoConstraints = NO;
-    if ([self.libraryTargetView.subviews containsObject:self.loadingOverlayView]) {
-        self.libraryTargetView.subviews = @[self.emptyLibraryView, self.loadingOverlayView];
-    } else {
-        self.libraryTargetView.subviews = @[self.emptyLibraryView];
-    }
-    NSView * const emptyLibraryView = self.emptyLibraryView;
-    NSDictionary * const dict = NSDictionaryOfVariableBindings(emptyLibraryView);
-    [self.libraryTargetView addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|[emptyLibraryView(>=572.)]|" options:0 metrics:0 views:dict]];
-    [self.libraryTargetView addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"V:|[emptyLibraryView(>=444.)]|" options:0 metrics:0 views:dict]];
-
-    self.placeholderImageView.image = [NSImage imageNamed:@"placeholder-video"];
-    self.placeholderLabel.stringValue = _NS("Your favorite videos will appear here.\nGo to the Browse section to add videos you love.");
+    [self.libraryWindow displayLibraryPlaceholderViewWithImage:[NSImage imageNamed:@"placeholder-video"]
+                                              usingConstraints:self.placeholderImageViewSizeConstraints
+                                             displayingMessage:_NS("Your favorite videos will appear here.\nGo to the Browse section to add videos you love.")];
 }
 
 - (void)presentHomeLibraryView
 {
-    self.homeLibraryView.translatesAutoresizingMaskIntoConstraints = NO;
-    if ([self.libraryTargetView.subviews containsObject:self.loadingOverlayView]) {
-        self.libraryTargetView.subviews = @[self.homeLibraryView, self.loadingOverlayView];
-    } else {
-        self.libraryTargetView.subviews = @[self.homeLibraryView];
-    }
-
-    NSDictionary * const dict = NSDictionaryOfVariableBindings(_homeLibraryView);
-    [self.libraryTargetView addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|[_homeLibraryView(>=572.)]|" options:0 metrics:0 views:dict]];
-    [self.libraryTargetView addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"V:|[_homeLibraryView(>=444.)]|" options:0 metrics:0 views:dict]];
-
-    const VLCLibraryViewModeSegment viewModeSegment = VLCLibraryWindowPersistentPreferences.sharedInstance.homeLibraryViewMode;
-
+    [self.libraryWindow displayLibraryView:self.homeLibraryView];
     self.homeLibraryStackViewScrollView.hidden = NO;
     [self.stackViewController reloadData];
 }
@@ -278,27 +206,10 @@
     }
 
     [_ongoingLongLoadingNotifications addObject:notification.name];
-
-    if ([self.libraryTargetView.subviews containsObject:self.loadingOverlayView]) {
-        return;
-    }
-
     if (self.connected) {
         [self.stackViewController disconnectContainers];
     }
-
-    self.loadingOverlayView.wantsLayer = YES;
-    self.loadingOverlayView.alphaValue = 0.0;
-
-    NSArray * const views = [self.libraryTargetView.subviews arrayByAddingObject:self.loadingOverlayView];
-    self.libraryTargetView.subviews = views;
-    [self.libraryTargetView addConstraints:_loadingOverlayViewConstraints];
-
-    [NSAnimationContext runAnimationGroup:^(NSAnimationContext * const context) {
-        context.duration = 0.5;
-        self.loadingOverlayView.animator.alphaValue = 1.0;
-    } completionHandler:nil];
-    [self.loadingOverlayView.indicator startAnimation:self];
+    [self.libraryWindow showLoadingOverlay];
 }
 
 - (void)libraryModelLongLoadFinished:(NSNotification *)notification
@@ -307,28 +218,10 @@
     if (_ongoingLongLoadingNotifications.count > 0) {
         return;
     }
-
-    if (![self.libraryTargetView.subviews containsObject:self.loadingOverlayView]) {
-        return;
-    }
-
     if (self.connected) {
         [self.stackViewController connectContainers];
     }
-
-    self.loadingOverlayView.wantsLayer = YES;
-    self.loadingOverlayView.alphaValue = 1.0;
-
-    [NSAnimationContext runAnimationGroup:^(NSAnimationContext * const context) {
-        context.duration = 1.0;
-        self.loadingOverlayView.animator.alphaValue = 0.0;
-    } completionHandler:^{
-        [self.libraryTargetView removeConstraints:_loadingOverlayViewConstraints];
-        NSMutableArray * const views = self.libraryTargetView.subviews.mutableCopy;
-        [views removeObject:self.loadingOverlayView];
-        self.libraryTargetView.subviews = views.copy;
-        [self.loadingOverlayView.indicator stopAnimation:self];
-    }];
+    [self.libraryWindow hideLoadingOverlay];
 }
 
 - (void)connect

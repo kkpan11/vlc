@@ -39,6 +39,8 @@ NS_ASSUME_NONNULL_BEGIN
 @class VLCCustomEmptyLibraryBrowseButton;
 @class VLCLibraryWindowSplitViewController;
 @class VLCLibraryWindowToolbarDelegate;
+@class VLCLoadingOverlayView;
+@class VLCNoResultsLabel;
 
 @protocol VLCMediaLibraryItemProtocol;
 
@@ -113,6 +115,11 @@ extern const NSUserInterfaceItemIdentifier VLCLibraryWindowIdentifier;
 @property (nonatomic, readwrite, strong) IBOutlet NSTextField *placeholderLabel;
 @property (nonatomic, readwrite, strong) IBOutlet VLCCustomEmptyLibraryBrowseButton *placeholderGoToBrowseButton;
 
+@property (readonly) VLCLoadingOverlayView *loadingOverlayView;
+@property (readonly) NSArray<NSLayoutConstraint *> *loadingOverlayViewConstraints;
+@property (readonly) NSArray<NSLayoutConstraint *> *placeholderImageViewConstraints;
+@property (readonly) VLCNoResultsLabel *noResultsLabel;
+
 @property (readwrite, nonatomic) NSInteger librarySegmentType;
 @property (readwrite) BOOL nonembedded;
 
@@ -130,7 +137,14 @@ extern const NSUserInterfaceItemIdentifier VLCLibraryWindowIdentifier;
 - (void)updateGridVsListViewModeSegmentedControl;
 - (void)updateFilterString;
 - (void)clearFilterString;
+- (void)showLoadingOverlay;
+- (void)hideLoadingOverlay;
 
+- (void)displayLibraryView:(NSView *)view;
+- (void)displayLibraryPlaceholderViewWithImage:(NSImage *)image
+                              usingConstraints:(NSArray<NSLayoutConstraint *> *)constraints
+                             displayingMessage:(NSString *)message;
+- (void)displayNoResultsMessage;
 - (void)presentLibraryItem:(id<VLCMediaLibraryItemProtocol>)libraryItem;
 - (void)goToLocalFolderMrl:(NSString *)mrl;
 

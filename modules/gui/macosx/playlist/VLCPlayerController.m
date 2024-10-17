@@ -21,6 +21,7 @@
  *****************************************************************************/
 
 #import "VLCPlayerController.h"
+#include "vlc_player.h"
 
 #import <vlc_configuration.h>
 #import <vlc_url.h>
@@ -1471,6 +1472,41 @@ static int BossCallback(vlc_object_t *p_this,
 - (NSArray<VLCTrackMetaData *> *)subtitleTracks
 {
     return [self tracksForCategory:SPU_ES];
+}
+
+- (VLCTrackMetaData *)selectedTrackMetadataOfCategory:(enum es_format_category_e)category
+{
+    vlc_player_Lock(_p_player);
+    const struct vlc_player_track * const p_track =
+        vlc_player_GetSelectedTrack(_p_player, category);
+    vlc_player_Unlock(_p_player);
+    return [[VLCTrackMetaData alloc] initWithTrackStructure:p_track];
+}
+
+- (BOOL)videoTracksEnabled
+{
+    vlc_player_Lock(_p_player);
+    const BOOL enabled = vlc_player_IsVideoEnabled(_p_player);
+    vlc_player_Unlock(_p_player);
+    return enabled;
+}
+
+- (VLCTrackMetaData *)selectedVideoTrack
+{
+    return [self selectedTrackMetadataOfCategory:VIDEO_ES];
+}
+
+- (BOOL)audioTracksEnabled
+{
+    vlc_player_Lock(_p_player);
+    const BOOL enabled = vlc_player_IsAudioEnabled(_p_player);
+    vlc_player_Unlock(_p_player);
+    return enabled;
+}
+
+- (VLCTrackMetaData *)selectedAudioTrack
+{
+    return [self selectedTrackMetadataOfCategory:AUDIO_ES];
 }
 
 - (void)programListChanged

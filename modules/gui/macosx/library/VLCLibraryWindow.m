@@ -37,6 +37,7 @@
 #import "playlist/VLCPlayerController.h"
 #import "playlist/VLCPlaylistController.h"
 
+#import "library/VLCInputItem.h"
 #import "library/VLCLibraryController.h"
 #import "library/VLCLibraryCollectionViewItem.h"
 #import "library/VLCLibraryCollectionViewSupplementaryElementView.h"
@@ -74,8 +75,9 @@
 #import "views/VLCLoadingOverlayView.h"
 #import "views/VLCNoResultsLabel.h"
 #import "views/VLCRoundedCornerTextField.h"
+#import "views/VLCTrackingView.h"
 
-#import "windows/controlsbar/VLCControlsBarCommon.h"
+#import "windows/controlsbar/VLCMainWindowControlsBar.h"
 
 #import "windows/video/VLCVoutView.h"
 #import "windows/video/VLCVideoOutputProvider.h"
@@ -183,6 +185,10 @@ static void addShadow(NSImageView *__unsafe_unretained imageView)
     [notificationCenter addObserver:self
                            selector:@selector(playerStateChanged:)
                                name:VLCPlayerStateChanged
+                             object:nil];
+    [notificationCenter addObserver:self
+                           selector:@selector(playerTrackSelectionChanged:)
+                               name:VLCPlayerTrackSelectionChanged
                              object:nil];
 
     _libraryMediaSourceViewController = [[VLCLibraryMediaSourceViewController alloc] initWithLibraryWindow:self];
@@ -701,10 +707,21 @@ static void addShadow(NSImageView *__unsafe_unretained imageView)
     }
 }
 
-// This handles reopening the video view when the user has closed it.
-- (void)reopenVideoView
+- (void)playerTrackSelectionChanged:(NSNotification *)notification
 {
-    [self enableVideoPlaybackAppearance];
+    VLCPlayerController * const playerController = self.playerController;
+    const BOOL videoTrackDisabled =
+        !playerController.videoTracksEnabled || !playerController.selectedVideoTrack.selected;
+    const BOOL audioTrackDisabled =
+        !playerController.audioTracksEnabled || !playerController.selectedAudioTrack.selected;
+    const BOOL currentItemIsAudio =
+        playerController.videoTracks.count == 0 && playerController.audioTracks.count > 0;
+    const BOOL artworkButtonDisabled =
+        (videoTrackDisabled && audioTrackDisabled) || (videoTrackDisabled && !currentItemIsAudio);
+    self.artworkButton.enabled = !artworkButtonDisabled;
+    self.artworkButton.hidden = artworkButtonDisabled;
+    self.controlsBar.thumbnailTrackingView.enabled = !artworkButtonDisabled;
+    self.controlsBar.thumbnailTrackingView.viewToHide.hidden = artworkButtonDisabled;
 }
 
 - (void)hideControlsBarImmediately
@@ -801,6 +818,17 @@ static void addShadow(NSImageView *__unsafe_unretained imageView)
 
 - (void)enableVideoPlaybackAppearance
 {
+    VLCPlayerController * const playerController = self.playerController;
+    const BOOL videoTrackDisabled =
+        !playerController.videoTracksEnabled || !playerController.selectedVideoTrack.selected;
+    const BOOL audioTrackDisabled =
+        !playerController.audioTracksEnabled || !playerController.selectedAudioTrack.selected;
+    const BOOL currentItemIsAudio =
+        playerController.videoTracks.count == 0 && playerController.audioTracks.count > 0;
+    if ((videoTrackDisabled && audioTrackDisabled) || (videoTrackDisabled && !currentItemIsAudio)) {
+        return;
+    }
+
     const BOOL isEmbedded = var_InheritBool(getIntf(), "embedded-video");
     if (!isEmbedded) {
         [self presentExternalWindows];
